@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>
+:root{--y:#FFC400;--bg:#000;--c:#121212;--c2:#1e1e1e;--t:#eee;--m:#888}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--t);font:15px system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:14px 16px;border-bottom:1px solid #222;display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+header b{color:var(--y)}
+main{flex:1;overflow-y:auto;padding:12px}
+nav{display:flex;border-top:1px solid #222;background:#0a0a0a}
+nav button{flex:1;padding:14px 0;background:none;border:0;color:var(--m);font-size:14px;font-weight:600}
+nav button.on{color:var(--y);box-shadow:inset 0 2px var(--y)}
+.ava{border-radius:50%;background:var(--y);color:#000;display:flex;align-items:center;justify-content:center;font-weight:800;overflow:hidden;flex-shrink:0;border:2px solid #8a6a00}
+.ava img{width:100%;height:100%;object-fit:cover}
+.row{display:flex;gap:12px;align-items:center;padding:12px;background:var(--c);border-radius:14px;margin-bottom:8px}
+.row .i{flex:1;min-width:0}.row .n{font-weight:700}
+.row .s{color:var(--m);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+input,textarea{width:100%;background:var(--c2);border:1px solid #333;border-radius:12px;color:var(--t);padding:12px;font:inherit;outline:none}
+input:focus,textarea:focus{border-color:var(--y)}
+.btn{background:var(--y);color:#000;border:0;border-radius:12px;padding:12px 18px;font-weight:800;font-size:15px}
+.btn.g{background:var(--c2);color:var(--y);border:1px solid #333}
+.btn.r{background:var(--c2);color:#ff5a5a}
+.center{max-width:340px;margin:auto;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center}
+.logo{width:96px;height:96px;border-radius:50%;border:4px solid var(--y);display:flex;align-items:center;justify-content:center;font-size:42px;box-shadow:0 0 24px #ffc40055}
+h1{color:var(--y);letter-spacing:2px}
+.err{color:#ff5a5a;font-size:13px;min-height:16px}
+.msgs{display:flex;flex-direction:column;gap:6px}
+.m{max-width:78%;padding:9px 13px;border-radius:16px;background:var(--c2);align-self:flex-start;word-wrap:break-word}
+.m.me{background:var(--y);color:#000;align-self:flex-end}
+.m small{display:block;font-size:10px;opacity:.55;margin-top:2px}
+.bar{display:flex;gap:8px;padding:10px;border-top:1px solid #222}
+.post{background:var(--c);border-radius:14px;padding:12px;margin-bottom:10px}
+.post .h{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.post .d{color:var(--m);font-size:12px}
+.lbl{color:var(--m);font-size:12px;margin:12px 0 4px;text-align:left;width:100%}
+.hide{display:none}
+</style></head>
+<body>
+<header id="hd"></header>
+<main id="mn"></main>
+<div id="ft"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S=null;
+try{S=JSON.parse(localStorage.getItem('trp'))}catch(e){}
+const save=()=>{try{localStorage.setItem('trp',JSON.stringify(S))}catch(e){}};
+let tab='chats',view=null,tmpAva=null;
+const DEMO=[{nick:'Alex',user:'alex'},{nick:'Mira',user:'mira'},{nick:'Neon',user:'neon'}];
+const REPLY=['Привет! 👋','Круто!','Расскажи подробнее','Ха, согласен','Ок, понял','Давай позже?','⚡'];
+const ago=t=>new Date(t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+function init(){
+  if(S&&S.me)return;
+  S=S||{};
+  S.users=DEMO.map(u=>({...u}));
+  S.posts=[
+    {user:'mira',text:'Всем привет в trippical! ⚡',t:Date.now()-3600000},
+    {user:'alex',text:'Тут тёмная тема и жёлтые акценты — красота.',t:Date.now()-1800000}
+  ];
+  S.chats={};
+}
+function ava(u,sz=44){
+  const x=u&&u.ava?`<img src="${u.ava}">`:esc(((u&&u.nick)||'?')[0].toUpperCase());
+  return `<div class="ava" style="width:${sz}px;height:${sz}px;font-size:${sz*0.42}px">${x}</div>`;
+}
+function userOf(un){
+  if(S.me&&S.me.user===un)return S.me;
+  return S.users.find(u=>u.user===un)||{nick:un,user:un};
+}
+function resize(file,cb){
+  const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{
+    const c=document.createElement('canvas');c.width=c.height=128;
+    const x=c.getContext('2d'),m=Math.min(im.width,im.height);
+    x.drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,128,128);
+    cb(c.toDataURL('image/jpeg',.8));
+  };im.src=r.result};
+  r.readAsDataURL(file);
+}
+
+function render(){
+  const hd=$('#hd'),mn=$('#mn'),ft=$('#ft');
+  if(!S||!S.me){
+    hd.classList.add('hide');ft.innerHTML='';
+    mn.innerHTML=`<div class="center" style="min-height:100%;justify-content:center">
+      <div class="logo">⚡</div><h1>trippical</h1>
+      <label style="cursor:pointer">${ava({nick:'+',ava:tmpAva},84)}
+        <input type="file" accept="image/*" id="af" class="hide"></label>
+      <div class="s" style="color:var(--m);font-size:12px">Аватарка (необязательно)</div>
+      <input id="nick" placeholder="Ник" maxlength="24">
+      <input id="user" placeholder="Юзернейм (a-z, 0-9, _)" maxlength="20" autocapitalize="none">
+      <div class="err" id="err"></div>
+      <button class="btn" style="width:100%" id="go">Войти</button></div>`;
+    $('#af').onchange=e=>{const f=e.target.files[0];if(f)resize(f,d=>{tmpAva=d;render()})};
+    $('#go').onclick=()=>{
+      const nick=$('#nick').value.trim(),user=$('#user').value.trim().toLowerCase().replace(/^@/,'');
+      if(!nick)return $('#err').textContent='Введи ник';
+      if(!/^[a-z0-9_]{3,20}$/.test(user))return $('#err').textContent='Юзернейм: 3–20 символов, a-z, 0-9, _';
+      if(DEMO.some(d=>d.user===user))return $('#err').textContent='Юзернейм занят';
+      init();S.me={nick,user,ava:tmpAva};save();render();
+    };
+    return;
+  }
+  hd.classList.remove('hide');
+  if(view&&view.t==='chat')return renderChat();
+  if(view&&view.t==='profile')return renderProfile();
+  hd.innerHTML=`<b>⚡</b> ${{chats:'Chats',lists:'Lists',account:'Account'}[tab]}`;
+  ft.innerHTML=`<nav>${['chats','lists','account'].map(t=>`<button class="${t===tab?'on':''}" data-t="${t}">${{chats:'Chats',lists:'Lists',account:'Account'}[t]}</button>`).join('')}</nav>`;
+  ft.querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+  if(tab==='chats')renderChats();
+  if(tab==='lists')renderLists();
+  if(tab==='account')renderAccount();
+}
+
+function renderChats(){
+  const ids=Object.keys(S.chats).sort((a,b)=>last(b).t-last(a).t);
+  function last(u){const m=S.chats[u];return m[m.length-1]||{t:0}}
+  $('#mn').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px">
+    <input id="q" placeholder="Найти по юзернейму…" autocapitalize="none"><button class="btn" id="fq">Найти</button></div>
+    <div class="err" id="err"></div>`+
+    (ids.length?ids.map(u=>{const o=userOf(u),l=last(u);
+      return `<div class="row" data-u="${u}">${ava(o)}<div class="i"><div class="n">${esc(o.nick)}</div><div class="s">${esc(l.text||'')}</div></div><div class="s">${l.t?ago(l.t):''}</div></div>`}).join('')
+    :`<div class="s" style="color:var(--m);text-align:center;margin-top:40px">Чатов пока нет.<br>Найди человека по юзернейму или зайди в Lists.</div>`);
+  document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{view={t:'chat',u:r.dataset.u};render()});
+  $('#fq').onclick=()=>{
+    const u=$('#q').value.trim().toLowerCase().replace(/^@/,'');
+    if(!S.users.some(x=>x.user===u))return $('#err').textContent='Пользователь не найден';
+    openChat(u);
+  };
+}
+function openChat(u){if(!S.chats[u])S.chats[u]=[];save();view={t:'chat',u};render()}
+
+function renderChat(){
+  const u=view.u,o=userOf(u);
+  $('#hd').innerHTML=`<span id="bk" style="color:var(--y);font-size:22px">←</span><span id="pf" style="display:flex;gap:10px;align-items:center">${ava(o,34)}${esc(o.nick)}</span>`;
+  $('#bk').onclick=goBack;
+  $('#pf').onclick=()=>{view={t:'profile',u,from:'chat'};render()};
+  $('#ft').innerHTML=`<div class="bar"><input id="tx" placeholder="Сообщение…"><button class="btn" id="sd">➤</button></div>`;
+  const ms=S.chats[u]||[];
+  $('#mn').innerHTML=`<div class="msgs">${ms.map(m=>`<div class="m ${m.from==='me'?'me':''}">${esc(m.text)}<small>${ago(m.t)}</small></div>`).join('')}</div>`;
+  $('#mn').scrollTop=$('#mn').scrollHeight;
+  const send=()=>{
+    const v=$('#tx').value.trim();if(!v)return;
+    S.chats[u].push({from:'me',text:v,t:Date.now()});save();
+    if(DEMO.some(d=>d.user===u))setTimeout(()=>{
+      S.chats[u].push({from:u,text:REPLY[Math.floor(Math.random()*REPLY.length)],t:Date.now()});save();
+      if(view&&view.t==='chat'&&view.u===u)renderChat();
+    },900);
+    renderChat();$('#tx').focus();
+  };
+  $('#sd').onclick=send;
+  $('#tx').onkeydown=e=>{if(e.key==='Enter')send()};
+}
+
+function renderLists(){
+  $('#mn').innerHTML=`<div class="post"><textarea id="pt" rows="2" placeholder="Что нового?"></textarea>
+    <button class="btn" style="margin-top:8px;width:100%" id="pb">Опубликовать</button></div>`+
+    [...S.posts].sort((a,b)=>b.t-a.t).map(p=>{const o=userOf(p.user);
+      return `<div class="post"><div class="h" data-u="${p.user}">${ava(o,38)}<div><div class="n" style="font-weight:700">${esc(o.nick)}</div><div class="d">@${esc(p.user)} · ${new Date(p.t).toLocaleString()}</div></div></div>${esc(p.text)}</div>`}).join('');
+  $('#pb').onclick=()=>{const v=$('#pt').value.trim();if(!v)return;S.posts.push({user:S.me.user,text:v,t:Date.now()});save();renderLists()};
+  document.querySelectorAll('.h').forEach(h=>h.onclick=()=>{view={t:'profile',u:h.dataset.u,from:'lists'};render()});
+}
+
+function renderProfile(){
+  const u=view.u,o=userOf(u),mine=u===S.me.user;
+  $('#hd').innerHTML=`<span id="bk" style="color:var(--y);font-size:22px">←</span>Профиль`;
+  $('#bk').onclick=goBack;$('#ft').innerHTML='';
+  const ps=S.posts.filter(p=>p.user===u).sort((a,b)=>b.t-a.t);
+  $('#mn').innerHTML=`<div class="center" style="margin-bottom:16px">${ava(o,96)}<h1 style="font-size:20px">${esc(o.nick)}</h1><div class="s" style="color:var(--m)">@${esc(u)}</div>
+    ${mine?'':`<button class="btn" id="wr" style="width:100%">Написать</button>`}</div>`+
+    ps.map(p=>`<div class="post">${esc(p.text)}<div class="d" style="margin-top:6px">${new Date(p.t).toLocaleString()}</div></div>`).join('');
+  if(!mine)$('#wr').onclick=()=>openChat(u);
+}
+
+function renderAccount(){
+  const m=S.me;
+  $('#mn').innerHTML=`<div class="center">
+    <label style="cursor:pointer">${ava(m,96)}<input type="file" accept="image/*" id="af" class="hide"></label>
+    <div class="s" style="color:var(--m);font-size:12px">Нажми на аватарку, чтобы сменить</div>
+    <div class="lbl">Ник</div><input id="nick" value="${esc(m.nick)}" maxlength="24">
+    <div class="lbl">Юзернейм</div><input value="@${esc(m.user)}" disabled style="opacity:.5">
+    <button class="btn" style="width:100%" id="sv">Сохранить</button>
+    <button class="btn g" style="width:100%" id="ra">Убрать аватарку</button>
+    <button class="btn r" style="width:100%" id="lo">Выйти и удалить аккаунт</button></div>`;
+  $('#af').onchange=e=>{const f=e.target.files[0];if(f)resize(f,d=>{S.me.ava=d;save();render()})};
+  $('#sv').onclick=()=>{const n=$('#nick').value.trim();if(n){S.me.nick=n;save();render()}};
+  $('#ra').onclick=()=>{S.me.ava=null;save();render()};
+  $('#lo').onclick=()=>{if(confirm('Удалить аккаунт и все данные?')){localStorage.removeItem('trp');S=null;tmpAva=null;view=null;render()}};
+}
+
+window.goBack=()=>{
+  if(view){const f=view.from;view=null;if(f==='lists')tab='lists';render();return true}
+  if(tab!=='chats'){tab='chats';render();return true}
+  return false;
+};
+render();
+</script></body></html>
